@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prospector Pro - Automator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <i class="fa-solid fa-robot"></i>
+                <span>Prospector Pro</span>
+            </div>
+            <nav>
+                <a href="#" class="active"><i class="fa-solid fa-magnifying-glass"></i> Búsqueda</a>
+                <a href="#" id="nav-wa-auth"><i class="fa-brands fa-whatsapp"></i> WhatsApp Auth</a>
+                <a href="#"><i class="fa-solid fa-clock"></i> Horarios (09-13hs)</a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header>
+                <h1>Nueva Campaña de Prospección</h1>
+                <p>Encuentra locales en tu ciudad y automatiza el contacto en horarios comerciales.</p>
+            </header>
+
+            <div class="grid-layout">
+                <!-- Configuración de Búsqueda -->
+                <section class="card glass-effect">
+                    <h2><i class="fa-solid fa-sliders"></i> Parámetros de Búsqueda</h2>
+                    <div class="form-group">
+                        <label for="rubro">Rubro o Tipo de Local</label>
+                        <input type="text" id="rubro" list="lista-rubros" placeholder="Ej: Restaurantes, Gimnasios..." value="Restaurantes">
+                        <datalist id="lista-rubros">
+                            <option value="Restaurantes">
+                            <option value="Gimnasios">
+                            <option value="Tiendas de Ropa">
+                            <option value="Peluquerías y Barberías">
+                            <option value="Estudios Jurídicos">
+                            <option value="Clínicas Odontológicas">
+                            <option value="Inmobiliarias">
+                            <option value="Veterinarias">
+                            <option value="Talleres Mecánicos">
+                            <option value="Centros de Estética">
+                            <option value="Ferreterías">
+                            <option value="Kioscos y Minimarkets">
+                        </datalist>
+                    </div>
+                    <div class="form-group">
+                        <label for="ciudad">Ciudad</label>
+                        <input type="text" id="ciudad" placeholder="Ej: Corrientes, Argentina" value="Corrientes, Argentina">
+                    </div>
+                    <div class="form-group">
+                        <label for="limite">Profundidad (Max. Resultados)</label>
+                        <input type="number" id="limite" value="10" min="1" max="100">
+                    </div>
+                    <button class="btn-primary" id="btn-buscar">
+                        <i class="fa-solid fa-search"></i> Buscar en Maps
+                    </button>
+                </section>
+
+                <!-- Configuración de Mensaje -->
+                <section class="card glass-effect">
+                    <h2><i class="fa-solid fa-message"></i> Plantilla de Mensaje</h2>
+                    <p class="text-sm text-muted">Usa <code>{nombre}</code> para que el sistema ponga el nombre del local automáticamente.</p>
+                    <div class="form-group mt-2">
+                        <textarea id="mensaje" rows="6">Hola {nombre}, mi nombre es Lucía. Noté que no tienen un sitio web activo. Ayudo a negocios en Corrientes a digitalizarse con diseños premium para atraer más clientes. ¿Te interesaría ver algunas opciones sin compromiso?</textarea>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Resultados -->
+            <section class="card glass-effect results-section mt-2">
+                <div class="results-header">
+                    <h2><i class="fa-solid fa-list-check"></i> Locales Encontrados</h2>
+                    <button class="btn-success" id="btn-aprobar" disabled>
+                        <i class="fa-solid fa-paper-plane"></i> Aprobar y Enviar Mensajes
+                    </button>
+                </div>
+                
+                <div class="table-container">
+                    <table id="tabla-resultados">
+                        <thead>
+                            <tr>
+                                <th>Selección</th>
+                                <th>Nombre del Local</th>
+                                <th>Teléfono</th>
+                                <th>Tiene Web</th>
+                                <th>Enlace Maps</th>
+                                <th>Estado de Envío</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="6" class="empty-state">Inicia una búsqueda para ver los resultados aquí.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
