@@ -10,6 +10,9 @@ start "Servidor Local" cmd /c "python server.py"
 
 timeout /t 3 /nobreak > nul
 
+:: Abre el tablero automáticamente en el navegador de tu computadora
+start http://localhost:5000
+
 echo.
 echo ========================================================
 echo     Generando tu Enlace Remoto para el Celular...
