@@ -2,6 +2,7 @@ from playwright.async_api import async_playwright
 import os
 import urllib.parse
 import asyncio
+import random
 
 SESSION_DIR = os.path.join(os.getcwd(), "wa_session")
 
@@ -76,15 +77,32 @@ async def send_messages(clients, template):
             try:
                 await page.goto(url, wait_until="domcontentloaded")
                 
-                # Esperar el botón de enviar
-                send_button = page.locator('span[data-icon="send"]')
-                await send_button.wait_for(timeout=20000)
-                await send_button.click()
+                # Esperar a que cargue la caja de texto
+                await page.wait_for_selector('div[contenteditable="true"]', timeout=20000)
+                await page.wait_for_timeout(2000) # Pequeña pausa para asegurar que el mensaje se pegó en la caja
+                
+                # Intentamos diferentes formas de enviar el mensaje (WA cambia frecuentemente)
+                button_clicked = False
+                for selector in ['button[aria-label="Enviar"]', 'span[data-icon="send"]']:
+                    btn = page.locator(selector).first
+                    if await btn.is_visible():
+                        await btn.click()
+                        button_clicked = True
+                        break
+                
+                if not button_clicked:
+                    # Fallback: Si no encuentra el botón, presionamos Enter
+                    await page.keyboard.press("Enter")
                 
                 # Esperar a que el mensaje salga de la bandeja
                 await page.wait_for_timeout(3000)
                 results.append({"phone": phone, "status": "Enviado"})
                 print(f"Mensaje enviado a {name} ({clean_phone})")
+                
+                # Para evitar bloqueos por spam, agregamos una pausa aleatoria
+                delay = random.uniform(15, 35) # entre 15 y 35 segundos
+                print(f"Esperando {delay:.1f} segundos antes del próximo mensaje...")
+                await asyncio.sleep(delay)
                 
             except Exception as e:
                 print(f"Error con {name} ({phone}): {e}")

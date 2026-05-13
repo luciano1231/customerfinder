@@ -41,14 +41,6 @@ def wa_auth():
 
 @app.route('/api/send', methods=['POST'])
 def send_bulk_messages():
-    # 1. Validación estricta de horarios comerciales (09:00 a 13:00)
-    now = datetime.now()
-    if not (9 <= now.hour < 13):
-        return jsonify({
-            "success": False, 
-            "error": f"Protección activa. Son las {now.strftime('%H:%M')}. Solo se permite enviar mensajes entre las 09:00 y las 13:00 hs para evitar molestar a los clientes."
-        })
-        
     data = request.json
     clients = data.get('clients', [])
     template = data.get('template', '')

@@ -17,9 +17,10 @@
                 <span>Prospector Pro</span>
             </div>
             <nav>
-                <a href="#" class="active"><i class="fa-solid fa-magnifying-glass"></i> Búsqueda</a>
+                <a href="#" class="nav-item active" data-target="view-busqueda"><i class="fa-solid fa-magnifying-glass"></i> Búsqueda</a>
+                <a href="#" class="nav-item" data-target="view-plantillas"><i class="fa-solid fa-file-lines"></i> Plantillas</a>
                 <a href="#" id="nav-wa-auth"><i class="fa-brands fa-whatsapp"></i> WhatsApp Auth</a>
-                <a href="#"><i class="fa-solid fa-clock"></i> Horarios (09-13hs)</a>
+                <a href="#"><i class="fa-solid fa-clock"></i> Horarios (Sin restricción)</a>
             </nav>
         </aside>
 
@@ -27,10 +28,11 @@
         <main class="main-content">
             <header>
                 <h1>Nueva Campaña de Prospección</h1>
-                <p>Encuentra locales en tu ciudad y automatiza el contacto en horarios comerciales.</p>
+                <p>Encuentra locales en tu ciudad y automatiza el contacto de forma masiva.</p>
             </header>
 
-            <div class="grid-layout">
+            <div id="view-busqueda" class="view-section">
+                <div class="grid-layout">
                 <!-- Configuración de Búsqueda -->
                 <section class="card glass-effect">
                     <h2><i class="fa-solid fa-sliders"></i> Parámetros de Búsqueda</h2>
@@ -70,6 +72,12 @@
                     <h2><i class="fa-solid fa-message"></i> Plantilla de Mensaje</h2>
                     <p class="text-sm text-muted">Usa <code>{nombre}</code> para que el sistema ponga el nombre del local automáticamente.</p>
                     <div class="form-group mt-2">
+                        <label for="template-selector">Seleccionar Plantilla</label>
+                        <select id="template-selector">
+                            <option value="default">Plantilla por defecto</option>
+                        </select>
+                    </div>
+                    <div class="form-group mt-2">
                         <textarea id="mensaje" rows="6">Hola {nombre}, mi nombre es Lucía. Noté que no tienen un sitio web activo. Ayudo a negocios en Corrientes a digitalizarse con diseños premium para atraer más clientes. ¿Te interesaría ver algunas opciones sin compromiso?</textarea>
                     </div>
                 </section>
@@ -104,6 +112,49 @@
                     </table>
                 </div>
             </section>
+            </div> <!-- End view-busqueda -->
+
+            <!-- Vista de Plantillas -->
+            <div id="view-plantillas" class="view-section" style="display: none;">
+                <div class="grid-layout">
+                    <section class="card glass-effect" style="grid-column: span 2;">
+                        <h2><i class="fa-solid fa-file-signature"></i> Gestor de Plantillas</h2>
+                        <p class="text-sm text-muted">Crea y guarda diferentes mensajes para distintas campañas. Usa <code>{nombre}</code> como variable.</p>
+                        
+                        <div style="display: flex; gap: 10px; margin-top: 20px;">
+                            <div class="form-group" style="flex: 1;">
+                                <label for="new-template-name">Nombre de la Plantilla</label>
+                                <input type="text" id="new-template-name" placeholder="Ej: Primer Contacto - Odontólogos">
+                            </div>
+                        </div>
+                        <div class="form-group mt-2">
+                            <label for="new-template-content">Contenido del Mensaje</label>
+                            <textarea id="new-template-content" rows="6" placeholder="Hola {nombre}, ..."></textarea>
+                        </div>
+                        <div class="mt-2" style="display: flex; gap: 10px;">
+                            <button class="btn-primary" id="btn-save-template">
+                                <i class="fa-solid fa-floppy-disk"></i> Guardar Plantilla
+                            </button>
+                        </div>
+
+                        <h3 style="margin-top: 30px; margin-bottom: 15px; font-size: 1.1rem; color: var(--text-color);">Plantillas Guardadas</h3>
+                        <div class="table-container">
+                            <table id="tabla-plantillas">
+                                <thead>
+                                    <tr>
+                                        <th>Nombre</th>
+                                        <th>Contenido</th>
+                                        <th style="width: 100px;">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Se llena con JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
+            </div> <!-- End view-plantillas -->
         </main>
     </div>
     <script src="app.js"></script>

@@ -3,6 +3,131 @@ document.addEventListener('DOMContentLoaded', () => {
     const tbody = document.querySelector('tbody');
     const navWaAuth = document.getElementById('nav-wa-auth');
     
+    // --- LÓGICA DE NAVEGACIÓN ---
+    const navItems = document.querySelectorAll('.nav-item');
+    const views = document.querySelectorAll('.view-section');
+
+    navItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            // Quitar active de todos
+            navItems.forEach(n => n.classList.remove('active'));
+            // Agregar al clickeado
+            item.classList.add('active');
+            
+            // Ocultar todas las vistas
+            views.forEach(v => v.style.display = 'none');
+            // Mostrar la vista objetivo
+            const targetId = item.getAttribute('data-target');
+            document.getElementById(targetId).style.display = 'block';
+        });
+    });
+
+    // --- LÓGICA DE PLANTILLAS ---
+    const defaultTemplate = "Hola {nombre}, mi nombre es Lucía. Noté que no tienen un sitio web activo. Ayudo a negocios en Corrientes a digitalizarse con diseños premium para atraer más clientes. ¿Te interesaría ver algunas opciones sin compromiso?";
+    
+    function getTemplates() {
+        const t = localStorage.getItem('templates');
+        return t ? JSON.parse(t) : [];
+    }
+    
+    function saveTemplates(templates) {
+        localStorage.setItem('templates', JSON.stringify(templates));
+    }
+
+    function renderTemplates() {
+        const templates = getTemplates();
+        const selector = document.getElementById('template-selector');
+        const tabla = document.querySelector('#tabla-plantillas tbody');
+        
+        // Actualizar Selector en Vista Búsqueda
+        selector.innerHTML = '<option value="default">Plantilla por defecto</option>';
+        templates.forEach((t, i) => {
+            selector.innerHTML += `<option value="${i}">${t.name}</option>`;
+        });
+
+        // Actualizar Tabla en Vista Plantillas
+        if(tabla) {
+            tabla.innerHTML = '';
+            if(templates.length === 0) {
+                tabla.innerHTML = '<tr><td colspan="3" class="empty-state">No hay plantillas personalizadas guardadas.</td></tr>';
+            } else {
+                templates.forEach((t, i) => {
+                    tabla.innerHTML += `
+                        <tr>
+                            <td><strong>${t.name}</strong></td>
+                            <td><div style="max-width:300px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${t.content}</div></td>
+                            <td>
+                                <button class="btn-delete-template" data-index="${i}" style="background:var(--error); color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+        }
+    }
+
+    renderTemplates();
+
+    const selector = document.getElementById('template-selector');
+    const txtMensaje = document.getElementById('mensaje');
+    
+    if(selector && txtMensaje) {
+        selector.addEventListener('change', (e) => {
+            if(e.target.value === 'default') {
+                txtMensaje.value = defaultTemplate;
+            } else {
+                const templates = getTemplates();
+                txtMensaje.value = templates[e.target.value].content;
+            }
+        });
+    }
+
+    const btnSaveTemplate = document.getElementById('btn-save-template');
+    if(btnSaveTemplate) {
+        btnSaveTemplate.addEventListener('click', () => {
+            const name = document.getElementById('new-template-name').value;
+            const content = document.getElementById('new-template-content').value;
+            
+            if(!name || !content) {
+                alert("Por favor completa el nombre y el contenido de la plantilla.");
+                return;
+            }
+            
+            const templates = getTemplates();
+            templates.push({ name, content });
+            saveTemplates(templates);
+            
+            document.getElementById('new-template-name').value = '';
+            document.getElementById('new-template-content').value = '';
+            
+            renderTemplates();
+            alert("¡Plantilla guardada con éxito!");
+        });
+    }
+
+    document.addEventListener('click', (e) => {
+        if(e.target.closest('.btn-delete-template')) {
+            const btn = e.target.closest('.btn-delete-template');
+            const index = btn.getAttribute('data-index');
+            if(confirm("¿Segura que deseas eliminar esta plantilla?")) {
+                const templates = getTemplates();
+                templates.splice(index, 1);
+                saveTemplates(templates);
+                renderTemplates();
+                
+                // Si la plantilla borrada estaba seleccionada, volver a default
+                if(document.getElementById('template-selector').value === index) {
+                    document.getElementById('template-selector').value = 'default';
+                    document.getElementById('mensaje').value = defaultTemplate;
+                }
+            }
+        }
+    });
+
+    
     // Autenticación de WhatsApp
     if(navWaAuth) {
         navWaAuth.addEventListener('click', async (e) => {
