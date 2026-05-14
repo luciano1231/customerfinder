@@ -80,12 +80,10 @@ def search_maps_stream():
         import asyncio
         from scraper import run_scraper
         try:
-            for c in ciudades:
-                if c:
-                    asyncio.run(run_scraper(
-                        rubro, c, limit, sent_phones, 
-                        on_result=lambda r: q.put({"type": "result", "data": r})
-                    ))
+            asyncio.run(run_scraper(
+                rubro, ciudades, limit, sent_phones, 
+                on_result=lambda r: q.put({"type": "result", "data": r})
+            ))
             q.put({"type": "done"})
         except Exception as e:
             q.put({"type": "error", "message": str(e)})

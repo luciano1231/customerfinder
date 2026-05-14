@@ -19,3 +19,8 @@ Press CTRL+C to quit
 127.0.0.1 - - [13/May/2026 21:20:58] "GET /styles.css HTTP/1.1" 304 -
 127.0.0.1 - - [13/May/2026 21:20:58] "GET /app.js HTTP/1.1" 304 -
 127.0.0.1 - - [13/May/2026 21:21:52] "GET /api/search_stream?rubro=Gimnasios&ciudad=Corrientes,+goya+corrientes,+posadas+misiones,+rosario+santa+fe,+formosa&limit=100 HTTP/1.1" 200 -
+127.0.0.1 - - [14/May/2026 00:25:48] "GET /api/status HTTP/1.1" 200 -
+127.0.0.1 - - [14/May/2026 00:25:48] "GET / HTTP/1.1" 304 -
+127.0.0.1 - - [14/May/2026 00:25:48] "GET /styles.css HTTP/1.1" 304 -
+127.0.0.1 - - [14/May/2026 00:25:49] "GET /app.js HTTP/1.1" 200 -
+127.0.0.1 - - [14/May/2026 00:26:38] "GET /api/search_stream?rubro=Restaurantes&ciudad=Corrientes,+goya,+posadas&limit=1 HTTP/1.1" 200 -

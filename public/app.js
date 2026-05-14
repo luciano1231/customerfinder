@@ -305,6 +305,17 @@ document.addEventListener('DOMContentLoaded', () => {
         
         currentSearchData = [];
         
+        // Preparar lista para guardado progresivo
+        const listId = Date.now();
+        const initialLists = getSavedLists();
+        initialLists.push({
+            id: listId,
+            date: new Date().toLocaleString('es-AR'),
+            name: `${rubro} en ${ciudad}`,
+            data: []
+        });
+        saveLists(initialLists);
+        
         // Efecto visual en la UI
         btnBuscar.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Extrayendo datos de Maps...';
         btnBuscar.disabled = true;
@@ -334,6 +345,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     const local = data.data;
                     currentSearchData.push(local);
                     
+                    // Guardado progresivo en localStorage
+                    const currentLists = getSavedLists();
+                    const targetList = currentLists.find(l => l.id === listId);
+                    if (targetList) {
+                        targetList.data.push(local);
+                        localStorage.setItem('saved_lists', JSON.stringify(currentLists));
+                    }
+                    
                     const tr = document.createElement('tr');
                     const idealClient = !local.has_web && local.phone !== "No tiene";
                     
@@ -357,15 +376,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     eventSource.close();
                     if (!hasResults) {
                         tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Búsqueda finalizada. No se encontraron resultados viables.</td></tr>`;
+                        // Eliminar la lista vacía si no hubo resultados
+                        const currentLists = getSavedLists();
+                        const newLists = currentLists.filter(l => l.id !== listId);
+                        saveLists(newLists);
                     } else {
-                        const lists = getSavedLists();
-                        lists.push({
-                            id: Date.now(),
-                            date: new Date().toLocaleString('es-AR'),
-                            name: `${rubro} en ${ciudad}`,
-                            data: currentSearchData
-                        });
-                        saveLists(lists);
+                        // Renderizar las listas guardadas para actualizar la vista
+                        renderSavedLists();
                     }
                     btnBuscar.innerHTML = '<i class="fa-solid fa-search"></i> Buscar en Maps';
                     btnBuscar.disabled = false;
@@ -373,6 +390,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     eventSource.close();
                     if (!hasResults) {
                         tbody.innerHTML = `<tr><td colspan="6" class="empty-state" style="color: #ef4444;">Ocurrió un error: ${data.message}</td></tr>`;
+                        // Eliminar la lista vacía si no hubo resultados
+                        const currentLists = getSavedLists();
+                        const newLists = currentLists.filter(l => l.id !== listId);
+                        saveLists(newLists);
+                    } else {
+                        renderSavedLists();
                     }
                     btnBuscar.innerHTML = '<i class="fa-solid fa-search"></i> Buscar en Maps';
                     btnBuscar.disabled = false;
@@ -385,6 +408,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 eventSource.close();
                 if (!hasResults) {
                     tbody.innerHTML = `<tr><td colspan="6" class="empty-state" style="color: #ef4444;">Error de conexión con el servidor. Revisar consola.</td></tr>`;
+                    // Eliminar la lista vacía
+                    const currentLists = getSavedLists();
+                    const newLists = currentLists.filter(l => l.id !== listId);
+                    saveLists(newLists);
+                } else {
+                    renderSavedLists();
                 }
                 btnBuscar.innerHTML = '<i class="fa-solid fa-search"></i> Buscar en Maps';
                 btnBuscar.disabled = false;
