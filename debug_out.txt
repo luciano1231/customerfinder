@@ -24,3 +24,7 @@ Press CTRL+C to quit
 127.0.0.1 - - [14/May/2026 00:25:48] "GET /styles.css HTTP/1.1" 304 -
 127.0.0.1 - - [14/May/2026 00:25:49] "GET /app.js HTTP/1.1" 200 -
 127.0.0.1 - - [14/May/2026 00:26:38] "GET /api/search_stream?rubro=Restaurantes&ciudad=Corrientes,+goya,+posadas&limit=1 HTTP/1.1" 200 -
+127.0.0.1 - - [14/May/2026 00:46:16] "GET /api/status HTTP/1.1" 200 -
+127.0.0.1 - - [14/May/2026 00:46:16] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [14/May/2026 00:46:16] "GET /styles.css HTTP/1.1" 304 -
+127.0.0.1 - - [14/May/2026 00:46:17] "GET /app.js HTTP/1.1" 304 -

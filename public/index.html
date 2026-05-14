@@ -82,7 +82,7 @@
                 <!-- Configuración de Mensaje -->
                 <section class="card glass-effect">
                     <h2><i class="fa-solid fa-message"></i> Plantilla de Mensaje</h2>
-                    <p class="text-sm text-muted">Usa <code>{nombre}</code> para que el sistema ponga el nombre del local automáticamente.</p>
+                    <p class="text-sm text-muted">Usa <code>{nombre}</code> para que el sistema ponga el nombre del local tal como aparece en Maps.<br><strong>¡NUEVO!</strong> Separa múltiples variantes de mensaje con <code>|||</code> para evadir bloqueos por spam.</p>
                     <div class="form-group mt-2">
                         <label for="template-selector">Seleccionar Plantilla</label>
                         <select id="template-selector">
@@ -157,7 +157,7 @@
                 <div class="grid-layout">
                     <section class="card glass-effect" style="grid-column: span 2;">
                         <h2><i class="fa-solid fa-file-signature"></i> Gestor de Plantillas</h2>
-                        <p class="text-sm text-muted">Crea y guarda diferentes mensajes para distintas campañas. Usa <code>{nombre}</code> como variable.</p>
+                        <p class="text-sm text-muted">Crea y guarda diferentes mensajes para distintas campañas.<br>Usa <code>{nombre}</code> para el nombre del local y separa variantes con <code>|||</code> (ej: Hola {nombre}... ||| Qué tal gente de {nombre}...)</p>
                         
                         <div style="display: flex; gap: 10px; margin-top: 20px;">
                             <div class="form-group" style="flex: 1;">
@@ -167,7 +167,7 @@
                         </div>
                         <div class="form-group mt-2">
                             <label for="new-template-content">Contenido del Mensaje</label>
-                            <textarea id="new-template-content" rows="6" placeholder="Hola {nombre}, ..."></textarea>
+                            <textarea id="new-template-content" rows="6" placeholder="Hola {nombre}, primera variante... ||| Qué tal gente de {nombre}, segunda variante... ||| Buenas, escribo a {nombre}, tercera variante..."></textarea>
                         </div>
                         <div class="mt-2" style="display: flex; gap: 10px;">
                             <button class="btn-primary" id="btn-save-template">

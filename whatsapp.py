@@ -69,7 +69,11 @@ async def send_messages(clients, template):
             if not clean_phone.startswith("54"): 
                 clean_phone = "54" + clean_phone
                 
-            msg = template.replace("{nombre}", name)
+            # Extraer variantes de mensajes separadas por |||
+            variants = [v.strip() for v in template.split('|||') if v.strip()]
+            selected_template = random.choice(variants) if variants else template
+                
+            msg = selected_template.replace("{nombre}", name)
             encoded_msg = urllib.parse.quote(msg)
             
             url = f"https://web.whatsapp.com/send?phone={clean_phone}&text={encoded_msg}"
