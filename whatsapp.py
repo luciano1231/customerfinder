@@ -99,8 +99,8 @@ async def send_messages(clients, template):
                 results.append({"phone": phone, "status": "Enviado"})
                 print(f"Mensaje enviado a {name} ({clean_phone})")
                 
-                # Para evitar bloqueos por spam, agregamos una pausa aleatoria
-                delay = random.uniform(15, 35) # entre 15 y 35 segundos
+                # Para evitar bloqueos por spam, agregamos una pausa aleatoria mayor
+                delay = random.uniform(45, 100) # entre 45 y 100 segundos
                 print(f"Esperando {delay:.1f} segundos antes del próximo mensaje...")
                 await asyncio.sleep(delay)
                 

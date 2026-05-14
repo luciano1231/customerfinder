@@ -18,6 +18,7 @@
             </div>
             <nav>
                 <a href="#" class="nav-item active" data-target="view-busqueda"><i class="fa-solid fa-magnifying-glass"></i> Búsqueda</a>
+                <a href="#" class="nav-item" data-target="view-listas"><i class="fa-solid fa-list"></i> Listas Guardadas</a>
                 <a href="#" class="nav-item" data-target="view-plantillas"><i class="fa-solid fa-file-lines"></i> Plantillas</a>
                 <a href="#" id="nav-wa-auth"><i class="fa-brands fa-whatsapp"></i> WhatsApp Auth</a>
                 <a href="#"><i class="fa-solid fa-clock"></i> Horarios (Sin restricción)</a>
@@ -55,16 +56,27 @@
                         </datalist>
                     </div>
                     <div class="form-group">
-                        <label for="ciudad">Ciudad</label>
-                        <input type="text" id="ciudad" placeholder="Ej: Corrientes, Argentina" value="Corrientes, Argentina">
+                        <label for="ciudad">Ciudad (puedes separar varias por coma)</label>
+                        <input type="text" id="ciudad" placeholder="Ej: Corrientes, Resistencia, Posadas" value="Corrientes, Argentina">
                     </div>
                     <div class="form-group">
                         <label for="limite">Profundidad (Max. Resultados)</label>
                         <input type="number" id="limite" value="10" min="1" max="100">
                     </div>
-                    <button class="btn-primary" id="btn-buscar">
-                        <i class="fa-solid fa-search"></i> Buscar en Maps
-                    </button>
+                    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                        <button class="btn-primary" id="btn-buscar" style="flex: 1;">
+                            <i class="fa-solid fa-search"></i> Buscar en Maps
+                        </button>
+                        <button class="btn-secondary" id="btn-save-preset" style="white-space: nowrap; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 0.8rem 1.5rem; border-radius: 8px; cursor: pointer; transition: all 0.3s ease;">
+                            <i class="fa-solid fa-bookmark"></i> Guardar Filtro
+                        </button>
+                    </div>
+                    <div>
+                        <p class="text-sm text-muted" style="margin-bottom: 8px;">Filtros Rápidos:</p>
+                        <div id="presets-container" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <!-- Presets se llenan con JS -->
+                        </div>
+                    </div>
                 </section>
 
                 <!-- Configuración de Mensaje -->
@@ -113,6 +125,32 @@
                 </div>
             </section>
             </div> <!-- End view-busqueda -->
+
+            <!-- Vista de Listas Guardadas -->
+            <div id="view-listas" class="view-section" style="display: none;">
+                <div class="grid-layout">
+                    <section class="card glass-effect" style="grid-column: span 2;">
+                        <h2><i class="fa-solid fa-list-check"></i> Mis Búsquedas Guardadas</h2>
+                        <p class="text-sm text-muted">Aquí se guardan automáticamente tus búsquedas. Selecciona una para continuar enviando mensajes otro día.</p>
+                        
+                        <div class="table-container mt-2">
+                            <table id="tabla-listas">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Búsqueda</th>
+                                        <th>Resultados</th>
+                                        <th style="width: 150px;">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Se llena con JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
+            </div> <!-- End view-listas -->
 
             <!-- Vista de Plantillas -->
             <div id="view-plantillas" class="view-section" style="display: none;">

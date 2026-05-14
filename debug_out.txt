@@ -1,0 +1,21 @@
+
+======================================================
+-> Prospector Pro Server (Python) iniciado correctamente
+-> Panel de Control disponible en: http://localhost:5000
+======================================================
+
+ * Serving Flask app 'server'
+ * Debug mode: off
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on http://127.0.0.1:5000
+Press CTRL+C to quit
+127.0.0.1 - - [13/May/2026 21:14:02] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [13/May/2026 21:14:02] "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 -
+127.0.0.1 - - [13/May/2026 21:14:02] "GET /styles.css HTTP/1.1" 304 -
+127.0.0.1 - - [13/May/2026 21:14:02] "GET /app.js HTTP/1.1" 200 -
+127.0.0.1 - - [13/May/2026 21:14:03] "GET /favicon.ico HTTP/1.1" 404 -
+127.0.0.1 - - [13/May/2026 21:20:57] "GET /api/status HTTP/1.1" 200 -
+127.0.0.1 - - [13/May/2026 21:20:58] "GET / HTTP/1.1" 304 -
+127.0.0.1 - - [13/May/2026 21:20:58] "GET /styles.css HTTP/1.1" 304 -
+127.0.0.1 - - [13/May/2026 21:20:58] "GET /app.js HTTP/1.1" 304 -
+127.0.0.1 - - [13/May/2026 21:21:52] "GET /api/search_stream?rubro=Gimnasios&ciudad=Corrientes,+goya+corrientes,+posadas+misiones,+rosario+santa+fe,+formosa&limit=100 HTTP/1.1" 200 -

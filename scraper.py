@@ -2,7 +2,7 @@ from playwright.async_api import async_playwright
 import urllib.parse
 import asyncio
 
-async def run_scraper(rubro, ciudad, limit=10):
+async def run_scraper(rubro, ciudad, limit=10, sent_phones=None, on_result=None):
     query = f"{rubro} en {ciudad}"
     encoded = urllib.parse.quote(query)
     url = f"https://www.google.com/maps/search/{encoded}"
@@ -45,7 +45,7 @@ async def run_scraper(rubro, ciudad, limit=10):
                         
                         # Clic en el local para ver detalles (teléfono y web)
                         await item.click()
-                        await page.wait_for_timeout(2500) # Tiempo de carga del panel
+                        await page.wait_for_timeout(1000) # Reducido a 1s para acelerar búsquedas masivas
                         
                         if not name or name == "Resultados":
                             try:
@@ -68,14 +68,32 @@ async def run_scraper(rubro, ciudad, limit=10):
                                 has_web = True
                         except: pass
                         
+                        if phone == "No tiene":
+                            print(f"Saltando {name}, no tiene número de teléfono.")
+                            continue
+                            
+                        # Limpiar teléfono para comparar
+                        clean_phone = phone.replace(" ", "").replace("-", "").replace("+", "")
+                        if clean_phone.startswith("0"): 
+                            clean_phone = "54" + clean_phone[1:]
+                        if not clean_phone.startswith("54"): 
+                            clean_phone = "54" + clean_phone
+                            
+                        if sent_phones and clean_phone in sent_phones:
+                            print(f"Saltando {name}, mensaje ya enviado anteriormente.")
+                            continue
+                        
                         if name and name != "Resultados":
-                            results.append({
+                            local_data = {
                                 "name": name,
                                 "phone": phone,
                                 "has_web": has_web,
                                 "url": href
-                            })
-                            print(f"Local extraído: {name}")
+                            }
+                            results.append(local_data)
+                            if on_result:
+                                on_result(local_data)
+                            print(f"Local extraído: {name} - {phone}")
                             
                     except Exception as e:
                         print(f"Error procesando local: {e}")
