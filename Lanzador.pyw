@@ -9,8 +9,20 @@ import sys
 server_process = None
 pinggy_process = None
 
+def server_running():
+    import urllib.request
+    try:
+        urllib.request.urlopen("http://localhost:5000/api/status", timeout=1)
+        return True
+    except Exception:
+        return False
+
 def toggle_server():
     global server_process
+    if server_process is None and server_running():
+        # Ya hay un servidor andando (por ejemplo de otra ventana): solo abrir el panel
+        webbrowser.open("http://localhost:5000")
+        return
     if server_process is None:
         try:
             # Iniciar el servidor de Flask de forma oculta (sin terminal)
@@ -23,7 +35,7 @@ def toggle_server():
             except ImportError:
                 python_exe = os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\WindowsApps\python.exe")
             
-            log_file = open("server_log.txt", "w", encoding="utf-8")
+            log_file = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "server_log.txt"), "w", encoding="utf-8")
             log_file.write(f"Lanzador sys.executable: {sys.executable}\n")
             log_file.write(f"Using python_exe: {python_exe}\n")
             log_file.flush()
@@ -149,5 +161,8 @@ btn_pinggy = tk.Button(
     state="disabled", activebackground="#7c3aed", activeforeground="white"
 )
 btn_pinggy.pack(pady=10)
+
+# Encender el servidor automáticamente al abrir el lanzador
+root.after(300, toggle_server)
 
 root.mainloop()

@@ -1,28 +1,22 @@
 @echo off
-color 0b
-title Prospector Pro - Panel Central
+chcp 65001 > nul
+title Prospector Pro
+cd /d "%~dp0"
 
-echo ========================================================
-echo     Iniciando el Motor de Prospector Pro (Servidor)
-echo ========================================================
-:: Abre el servidor en una nueva ventana oculta o paralela
-start "Servidor Local" cmd /c "python server.py"
+where python > nul 2>&1
+if errorlevel 1 (
+    echo No se encontro Python. Instalalo desde https://www.python.org/downloads/ ^(marca "Add to PATH"^).
+    pause
+    exit /b
+)
 
-timeout /t 3 /nobreak > nul
+:: Primera vez: instalar dependencias y el navegador de Playwright
+python -c "import flask, playwright, openpyxl" > nul 2>&1
+if errorlevel 1 (
+    echo Instalando dependencias por unica vez...
+    python -m pip install -r requirements.txt
+    python -m playwright install chromium
+)
 
-:: Abre el tablero automáticamente en el navegador de tu computadora
-start http://localhost:5000
-
-echo.
-echo ========================================================
-echo     Generando tu Enlace Remoto para el Celular...
-echo ========================================================
-echo.
-echo Espera unos segundos y copia el enlace web que aparecera a continuacion
-echo (El que termina en pinggy.link).
-echo Cuando quieras terminar de usarlo, solo cierra esta ventana.
-echo.
-
-ssh -p 443 -o StrictHostKeyChecking=no -R0:localhost:5000 a.pinggy.io
-
-pause
+:: Abre el lanzador (ventanita con el boton de encendido) sin consola
+start "" pythonw Lanzador.pyw

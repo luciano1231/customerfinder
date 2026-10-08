@@ -1,492 +1,445 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const btnBuscar = document.getElementById('btn-buscar');
-    const tbody = document.querySelector('tbody');
-    const navWaAuth = document.getElementById('nav-wa-auth');
-    
-    // --- LÓGICA DE NAVEGACIÓN ---
-    const navItems = document.querySelectorAll('.nav-item');
-    const views = document.querySelectorAll('.view-section');
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const api = async (url, opts = {}) => {
+        const res = await fetch(url, opts.body ? { method: 'POST', headers: {'Content-Type': 'application/json'}, ...opts, body: JSON.stringify(opts.body) } : opts);
+        const ct = res.headers.get('content-type') || '';
+        return ct.includes('json') ? res.json() : res;
+    };
 
-    navItems.forEach(item => {
-        item.addEventListener('click', (e) => {
-            e.preventDefault();
-            // Quitar active de todos
-            navItems.forEach(n => n.classList.remove('active'));
-            // Agregar al clickeado
-            item.classList.add('active');
-            
-            // Ocultar todas las vistas
-            views.forEach(v => v.style.display = 'none');
-            // Mostrar la vista objetivo
-            const targetId = item.getAttribute('data-target');
-            document.getElementById(targetId).style.display = 'block';
-        });
+    const ESTADOS = {
+        nuevo: ['Nuevo', 'gray'], en_cola: ['En cola', 'blue'], enviado: ['Enviado', 'green'],
+        sin_whatsapp: ['Sin WhatsApp', 'gray'], error: ['Error', 'red'], respondio: ['Respondió', 'gold'],
+        no_interesa: ['No le interesa', 'red'],
+    };
+    const badge = (estado) => { const [t, c] = ESTADOS[estado] || [estado, 'gray']; return `<span class="badge ${c}">${t}</span>`; };
+
+    // ---------------- navegación ----------------
+    const views = { 'view-listas': loadSearches, 'view-contactos': loadContacts, 'view-plantillas': loadTemplates, 'view-envios': loadEnvios };
+    function showView(id) {
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.target === id));
+        document.querySelectorAll('.view-section').forEach(v => v.style.display = v.id === id ? 'block' : 'none');
+        if (views[id]) views[id]();
+    }
+    document.querySelectorAll('.nav-item').forEach(item => item.addEventListener('click', e => { e.preventDefault(); showView(item.dataset.target); }));
+
+    // ---------------- resultados (tabla principal) ----------------
+    let places = [];           // locales cargados en la tabla
+    let currentTitle = 'Resultados';
+    const selected = new Set();
+
+    function visiblePlaces() {
+        const f = {
+            sinweb: $('f-sinweb').checked, sinfudo: $('f-sinfudo').checked, nocturno: $('f-nocturno').checked,
+            tel: $('f-tel').checked, celular: $('f-celular').checked, nuevos: $('f-nuevos').checked,
+            resenas: parseInt($('f-resenas').value) || 0, texto: $('f-texto').value.trim().toLowerCase(),
+        };
+        return places.filter(p => {
+            if (f.sinweb && p.web_tipo === 'Web propia') return false;
+            if (f.sinfudo && (p.web_tipo === 'FUDO' || p.web_tipo === 'Plataforma menú/pedidos')) return false;
+            if (f.nocturno && !p.nocturno) return false;
+            if (f.tel && !p.wa_phone) return false;
+            if (f.celular && p.tel_tipo !== 'Celular') return false;
+            if (f.nuevos && !['nuevo', 'error'].includes(p.estado)) return false;
+            if ((p.reviews || 0) < f.resenas) return false;
+            if (f.texto && !`${p.name} ${p.categoria}`.toLowerCase().includes(f.texto)) return false;
+            return true;
+        }).sort((a, b) => (b.reviews || 0) - (a.reviews || 0));
+    }
+
+    function webCell(p) {
+        const cls = { 'Web propia': 'blue', 'FUDO': 'red', 'Plataforma menú/pedidos': 'red', 'Sin web': 'green' }[p.web_tipo] || 'gold';
+        return `<span class="badge ${cls}">${esc(p.web_tipo || '-')}</span>`;
+    }
+
+    function linksCell(p) {
+        const out = [];
+        if (p.wa_link) out.push(`<a href="${esc(p.wa_link)}" target="_blank" class="lnk wa" title="Abrir chat de WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>`);
+        if (p.instagram) out.push(`<a href="${esc(p.instagram)}" target="_blank" class="lnk ig" title="Instagram"><i class="fa-brands fa-instagram"></i></a>`);
+        if (p.web && p.web !== p.instagram) out.push(`<a href="${esc(p.web)}" target="_blank" class="lnk" title="${esc(p.web)}"><i class="fa-solid fa-globe"></i></a>`);
+        if (p.maps_url) out.push(`<a href="${esc(p.maps_url)}" target="_blank" class="lnk" title="Google Maps"><i class="fa-solid fa-map-location-dot"></i></a>`);
+        return out.join(' ');
+    }
+
+    function renderResults() {
+        const tbody = document.querySelector('#tabla-resultados tbody');
+        const list = visiblePlaces();
+        $('results-title').innerHTML = `<i class="fa-solid fa-list-check"></i> ${esc(currentTitle)}`;
+        $('results-count').textContent = places.length
+            ? `Mostrando ${list.length} de ${places.length} locales · ${selected.size} seleccionados · ordenados por cantidad de reseñas`
+            : '';
+        $('btn-excel').disabled = list.length === 0;
+        $('btn-preparar').disabled = selected.size === 0;
+        if (!list.length) {
+            tbody.innerHTML = `<tr><td colspan="8" class="empty-state">${places.length ? 'Ningún local cumple los filtros.' : 'Hacé una búsqueda o abrí una búsqueda guardada.'}</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = list.map(p => `
+            <tr>
+                <td><input type="checkbox" class="row-check" data-id="${esc(p.id)}" ${selected.has(p.id) ? 'checked' : ''}></td>
+                <td><strong>${esc(p.name)}</strong><br><small class="text-muted">${esc(p.categoria || p.rubro || '')}</small></td>
+                <td>${p.reviews || 0}${p.rating ? `<br><small class="text-muted">★ ${p.rating}</small>` : ''}</td>
+                <td>${esc(p.phone || '-')}<br><small class="text-muted">${esc(p.tel_tipo || '')}</small></td>
+                <td>${webCell(p)}</td>
+                <td>${p.nocturno ? '<i class="fa-solid fa-moon" style="color:#a78bfa" title="' + esc((p.horarios || []).join('\n')) + '"></i>' : ''}</td>
+                <td>${badge(p.estado)}</td>
+                <td class="links">${linksCell(p)}</td>
+            </tr>`).join('');
+        $('check-all').checked = list.every(p => selected.has(p.id));
+    }
+
+    document.querySelector('#tabla-resultados tbody').addEventListener('change', e => {
+        if (!e.target.classList.contains('row-check')) return;
+        e.target.checked ? selected.add(e.target.dataset.id) : selected.delete(e.target.dataset.id);
+        renderResults();
+    });
+    $('check-all').addEventListener('change', e => {
+        visiblePlaces().forEach(p => e.target.checked ? selected.add(p.id) : selected.delete(p.id));
+        renderResults();
+    });
+    ['f-sinweb', 'f-sinfudo', 'f-nocturno', 'f-tel', 'f-celular', 'f-nuevos', 'f-resenas', 'f-texto']
+        .forEach(id => $(id).addEventListener('input', renderResults));
+
+    function loadPlaces(list, title) {
+        places = list;
+        currentTitle = title;
+        selected.clear();
+        renderResults();
+    }
+
+    // ---------------- búsqueda en Maps ----------------
+    let eventSource = null;
+    function endSearch(msg) {
+        if (eventSource) eventSource.close();
+        eventSource = null;
+        $('btn-buscar').disabled = false;
+        $('btn-buscar').innerHTML = '<i class="fa-solid fa-search"></i> Buscar en Maps';
+        $('btn-detener').style.display = 'none';
+        if (msg) $('search-log').textContent = msg;
+    }
+
+    $('btn-buscar').addEventListener('click', () => {
+        const rubro = $('rubro').value.trim();
+        const ciudades = $('ciudades').value.trim();
+        if (!rubro || !ciudades) return alert('Completá el rubro y al menos una ciudad.');
+        loadPlaces([], `${rubro} en ${ciudades.split('\n').join(' / ')}`);
+        $('btn-buscar').disabled = true;
+        $('btn-buscar').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Buscando...';
+        $('btn-detener').style.display = '';
+        $('search-log').textContent = 'Abriendo Google Maps... (aprox. 1 minuto cada 15 locales)';
+
+        const params = new URLSearchParams({ rubro, ciudades, limit: $('limite').value });
+        eventSource = new EventSource('/api/search_stream?' + params);
+        eventSource.onmessage = (ev) => {
+            const d = JSON.parse(ev.data);
+            if (d.status === 'result') {
+                places.push(d.data);
+                if (['nuevo', 'error'].includes(d.data.estado)) selected.add(d.data.id);
+                renderResults();
+                $('search-log').textContent = `${places.length} locales leídos... último: ${d.data.name}`;
+            } else if (d.status === 'log') {
+                $('search-log').textContent = d.message;
+            } else if (d.status === 'done') {
+                endSearch(`Búsqueda terminada: ${places.length} locales. Quedó guardada en "Búsquedas guardadas".`);
+            } else if (d.status === 'error') {
+                endSearch('Error: ' + d.message);
+            }
+        };
+        eventSource.onerror = () => endSearch(places.length ? `Conexión cortada. Se guardaron ${places.length} locales.` : 'No se pudo conectar con el servidor (¿hay otra búsqueda en curso?).');
+    });
+    $('btn-detener').addEventListener('click', () => api('/api/search/stop', { method: 'POST' }));
+
+    // ---------------- filtros guardados ----------------
+    async function renderPresets() {
+        const presets = await api('/api/presets');
+        $('presets-container').innerHTML = presets.map(p => `
+            <span class="chip" data-id="${p.id}" data-rubro="${esc(p.rubro)}" data-ciudades="${esc(p.ciudades)}" data-limite="${p.limite}">
+                ${esc(p.rubro)} · ${esc(p.ciudades.split('\n')[0])} <i class="fa-solid fa-xmark del" title="Borrar"></i>
+            </span>`).join('');
+    }
+    $('presets-container').addEventListener('click', async e => {
+        const chip = e.target.closest('.chip');
+        if (!chip) return;
+        if (e.target.classList.contains('del')) {
+            await fetch('/api/presets/' + chip.dataset.id, { method: 'DELETE' });
+            return renderPresets();
+        }
+        $('rubro').value = chip.dataset.rubro;
+        $('ciudades').value = chip.dataset.ciudades;
+        $('limite').value = chip.dataset.limite;
+    });
+    $('btn-save-preset').addEventListener('click', async () => {
+        await api('/api/presets', { body: { rubro: $('rubro').value, ciudades: $('ciudades').value, limite: $('limite').value } });
+        renderPresets();
     });
 
-    // --- LÓGICA DE PRESETS (Filtros Rápidos) ---
-    const btnSavePreset = document.getElementById('btn-save-preset');
-    const presetsContainer = document.getElementById('presets-container');
-    
-    function getPresets() {
-        return JSON.parse(localStorage.getItem('search_presets') || '[]');
+    // ---------------- Excel ----------------
+    async function downloadExcel(ids, title) {
+        const res = await fetch('/api/excel', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ ids, title }) });
+        if (!res.ok) return alert('No se pudo generar el Excel.');
+        const blob = await res.blob();
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `${title}.xlsx`.replace(/[\\/*?:"<>|]/g, '');
+        a.click();
     }
-    
-    function savePresets(presets) {
-        localStorage.setItem('search_presets', JSON.stringify(presets));
-        renderPresets();
-    }
-    
-    function renderPresets() {
-        if(!presetsContainer) return;
-        const presets = getPresets();
-        presetsContainer.innerHTML = '';
-        if(presets.length === 0) {
-            presetsContainer.innerHTML = '<span class="text-sm text-muted">No tienes filtros guardados.</span>';
-            return;
-        }
-        presets.forEach((p, i) => {
-            const btn = document.createElement('button');
-            btn.className = 'btn-secondary';
-            btn.style.padding = '4px 10px';
-            btn.style.fontSize = '0.85rem';
-            btn.style.borderRadius = '15px';
-            btn.style.background = 'rgba(255,255,255,0.05)';
-            btn.innerHTML = `${p.rubro} - ${p.ciudad} <i class="fa-solid fa-xmark btn-delete-preset" data-index="${i}" style="margin-left:5px;cursor:pointer;color:var(--error);"></i>`;
-            
-            btn.addEventListener('click', (e) => {
-                if(e.target.classList.contains('btn-delete-preset')) {
-                    e.stopPropagation();
-                    const newPresets = getPresets();
-                    newPresets.splice(i, 1);
-                    savePresets(newPresets);
-                } else {
-                    document.getElementById('rubro').value = p.rubro;
-                    document.getElementById('ciudad').value = p.ciudad;
-                    document.getElementById('limite').value = p.limite;
-                }
-            });
-            presetsContainer.appendChild(btn);
-        });
-    }
-    
-    if(btnSavePreset) {
-        btnSavePreset.addEventListener('click', () => {
-            const rubro = document.getElementById('rubro').value;
-            const ciudad = document.getElementById('ciudad').value;
-            const limite = document.getElementById('limite').value;
-            if(!rubro || !ciudad) return alert("Completa Rubro y Ciudad para guardar el filtro.");
-            
-            const presets = getPresets();
-            presets.push({rubro, ciudad, limite});
-            savePresets(presets);
-        });
-        renderPresets();
-    }
+    $('btn-excel').addEventListener('click', () => downloadExcel(visiblePlaces().map(p => p.id), currentTitle));
 
-    // --- LÓGICA DE LISTAS GUARDADAS ---
-    const tablaListas = document.querySelector('#tabla-listas tbody');
-    let currentSearchData = [];
-    
-    function getSavedLists() {
-        return JSON.parse(localStorage.getItem('saved_lists') || '[]');
-    }
-    
-    function saveLists(lists) {
-        localStorage.setItem('saved_lists', JSON.stringify(lists));
-        renderSavedLists();
-    }
-    
-    function renderSavedLists() {
-        if(!tablaListas) return;
-        const lists = getSavedLists();
-        tablaListas.innerHTML = '';
-        if(lists.length === 0) {
-            tablaListas.innerHTML = '<tr><td colspan="4" class="empty-state">No hay listas guardadas. Realiza una búsqueda primero.</td></tr>';
-            return;
-        }
-        // Mostrar en orden reverso (más nuevas primero)
-        [...lists].reverse().forEach(list => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${list.date}</td>
-                <td><strong>${list.name}</strong></td>
-                <td>${list.data.length} locales</td>
-                <td>
-                    <button class="btn-load-list" data-id="${list.id}" style="background:var(--accent); color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; margin-right:5px;">
-                        <i class="fa-solid fa-folder-open"></i> Cargar
-                    </button>
-                    <button class="btn-delete-list" data-id="${list.id}" style="background:var(--error); color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">
-                        <i class="fa-solid fa-trash"></i>
-                    </button>
+    // ---------------- búsquedas guardadas ----------------
+    async function loadSearches() {
+        const searches = await api('/api/searches');
+        const tbody = document.querySelector('#tabla-listas tbody');
+        tbody.innerHTML = searches.length ? searches.map(s => `
+            <tr>
+                <td>${esc(s.created)}</td>
+                <td><strong>${esc(s.rubro)}</strong><br><small class="text-muted">${esc(s.ciudades)}</small></td>
+                <td>${s.total}</td>
+                <td>${s.contactados || 0}</td>
+                <td class="actions">
+                    <button class="btn-primary btn-sm" data-act="open" data-id="${s.id}" data-title="${esc(s.rubro + ' en ' + s.ciudades)}"><i class="fa-solid fa-folder-open"></i> Abrir</button>
+                    <button class="btn-ghost btn-sm" data-act="excel" data-id="${s.id}" data-title="${esc(s.rubro + ' en ' + s.ciudades)}"><i class="fa-solid fa-file-excel"></i></button>
+                    <button class="btn-danger btn-sm" data-act="del" data-id="${s.id}"><i class="fa-solid fa-trash"></i></button>
                 </td>
-            `;
-            tablaListas.appendChild(tr);
-        });
+            </tr>`).join('') : '<tr><td colspan="5" class="empty-state">Todavía no hay búsquedas guardadas.</td></tr>';
     }
-    
-    function loadListToTable(listData) {
-        tbody.innerHTML = '';
-        currentSearchData = listData;
-        
-        if(listData.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Lista vacía.</td></tr>';
-            return;
-        }
-        
-        listData.forEach(local => {
-            const idealClient = !local.has_web && local.phone !== "No tiene";
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td><input type="checkbox" class="local-check" ${idealClient ? 'checked' : ''} data-phone="${local.phone}" data-name="${local.name}"></td>
-                <td><strong>${local.name}</strong> ${idealClient ? '<span style="color:var(--success);font-size:0.8rem;margin-left:5px;"><i class="fa-solid fa-star"></i> Ideal</span>' : ''}</td>
-                <td>${local.phone}</td>
-                <td>${local.has_web ? '<span style="color:var(--accent)"><i class="fa-solid fa-check"></i> Sí</span>' : '<span style="color:var(--text-muted)"><i class="fa-solid fa-xmark"></i> No</span>'}</td>
-                <td><a href="${local.url}" target="_blank" style="color: var(--accent); text-decoration: none;"><i class="fa-solid fa-map-location-dot"></i> Maps</a></td>
-                <td><span class="status-badge" style="background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;">Pendiente</span></td>
-            `;
-            tbody.appendChild(tr);
-        });
-        
-        document.getElementById('btn-aprobar').disabled = false;
-        
-        // Cambiar a la vista de Búsqueda
-        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-        document.querySelector('[data-target="view-busqueda"]').classList.add('active');
-        document.querySelectorAll('.view-section').forEach(v => v.style.display = 'none');
-        document.getElementById('view-busqueda').style.display = 'block';
-    }
-
-    if(tablaListas) {
-        renderSavedLists();
-        tablaListas.addEventListener('click', (e) => {
-            const btnLoad = e.target.closest('.btn-load-list');
-            const btnDelete = e.target.closest('.btn-delete-list');
-            
-            if(btnLoad) {
-                const id = parseInt(btnLoad.getAttribute('data-id'));
-                const list = getSavedLists().find(l => l.id === id);
-                if(list) loadListToTable(list.data);
-            }
-            
-            if(btnDelete) {
-                if(confirm("¿Eliminar esta lista guardada?")) {
-                    const id = parseInt(btnDelete.getAttribute('data-id'));
-                    const lists = getSavedLists().filter(l => l.id !== id);
-                    saveLists(lists);
-                }
-            }
-        });
-    }
-
-    // --- LÓGICA DE PLANTILLAS ---
-    const defaultTemplate = "Hola {nombre}, mi nombre es Lucía. Noté que no tienen un sitio web activo. Ayudo a negocios en Corrientes a digitalizarse con diseños premium para atraer más clientes. ¿Te interesaría ver algunas opciones sin compromiso?";
-    
-    function getTemplates() {
-        const t = localStorage.getItem('templates');
-        return t ? JSON.parse(t) : [];
-    }
-    
-    function saveTemplates(templates) {
-        localStorage.setItem('templates', JSON.stringify(templates));
-    }
-
-    function renderTemplates() {
-        const templates = getTemplates();
-        const selector = document.getElementById('template-selector');
-        const tabla = document.querySelector('#tabla-plantillas tbody');
-        
-        // Actualizar Selector en Vista Búsqueda
-        selector.innerHTML = '<option value="default">Plantilla por defecto</option>';
-        templates.forEach((t, i) => {
-            selector.innerHTML += `<option value="${i}">${t.name}</option>`;
-        });
-
-        // Actualizar Tabla en Vista Plantillas
-        if(tabla) {
-            tabla.innerHTML = '';
-            if(templates.length === 0) {
-                tabla.innerHTML = '<tr><td colspan="3" class="empty-state">No hay plantillas personalizadas guardadas.</td></tr>';
-            } else {
-                templates.forEach((t, i) => {
-                    tabla.innerHTML += `
-                        <tr>
-                            <td><strong>${t.name}</strong></td>
-                            <td><div style="max-width:300px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${t.content}</div></td>
-                            <td>
-                                <button class="btn-delete-template" data-index="${i}" style="background:var(--error); color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">
-                                    <i class="fa-solid fa-trash"></i>
-                                </button>
-                            </td>
-                        </tr>
-                    `;
-                });
-            }
-        }
-    }
-
-    renderTemplates();
-
-    const selector = document.getElementById('template-selector');
-    const txtMensaje = document.getElementById('mensaje');
-    
-    if(selector && txtMensaje) {
-        selector.addEventListener('change', (e) => {
-            if(e.target.value === 'default') {
-                txtMensaje.value = defaultTemplate;
-            } else {
-                const templates = getTemplates();
-                txtMensaje.value = templates[e.target.value].content;
-            }
-        });
-    }
-
-    const btnSaveTemplate = document.getElementById('btn-save-template');
-    if(btnSaveTemplate) {
-        btnSaveTemplate.addEventListener('click', () => {
-            const name = document.getElementById('new-template-name').value;
-            const content = document.getElementById('new-template-content').value;
-            
-            if(!name || !content) {
-                alert("Por favor completa el nombre y el contenido de la plantilla.");
-                return;
-            }
-            
-            const templates = getTemplates();
-            templates.push({ name, content });
-            saveTemplates(templates);
-            
-            document.getElementById('new-template-name').value = '';
-            document.getElementById('new-template-content').value = '';
-            
-            renderTemplates();
-            alert("¡Plantilla guardada con éxito!");
-        });
-    }
-
-    document.addEventListener('click', (e) => {
-        if(e.target.closest('.btn-delete-template')) {
-            const btn = e.target.closest('.btn-delete-template');
-            const index = btn.getAttribute('data-index');
-            if(confirm("¿Segura que deseas eliminar esta plantilla?")) {
-                const templates = getTemplates();
-                templates.splice(index, 1);
-                saveTemplates(templates);
-                renderTemplates();
-                
-                // Si la plantilla borrada estaba seleccionada, volver a default
-                if(document.getElementById('template-selector').value === index) {
-                    document.getElementById('template-selector').value = 'default';
-                    document.getElementById('mensaje').value = defaultTemplate;
-                }
-            }
+    document.querySelector('#tabla-listas tbody').addEventListener('click', async e => {
+        const b = e.target.closest('button');
+        if (!b) return;
+        const id = b.dataset.id;
+        if (b.dataset.act === 'open') {
+            loadPlaces(await api(`/api/searches/${id}/places`), b.dataset.title);
+            showView('view-busqueda');
+        } else if (b.dataset.act === 'excel') {
+            const list = await api(`/api/searches/${id}/places`);
+            downloadExcel(list.map(p => p.id), b.dataset.title);
+        } else if (b.dataset.act === 'del' && confirm('¿Borrar esta búsqueda? Los locales que ya contactaste se conservan en Contactos.')) {
+            await fetch('/api/searches/' + id, { method: 'DELETE' });
+            loadSearches();
         }
     });
 
-    
-    // Autenticación de WhatsApp
-    if(navWaAuth) {
-        navWaAuth.addEventListener('click', async (e) => {
-            e.preventDefault();
-            alert("Se abrirá una ventana de navegador. Por favor escanea el código QR con tu WhatsApp y espera a que carguen tus chats. Luego la ventana se cerrará automáticamente y tu sesión quedará guardada de forma segura.");
-            try {
-                await fetch('/api/wa_auth', { method: 'POST' });
-                alert("¡Excelente! WhatsApp conectado y sesión guardada correctamente.");
-            } catch(error) {
-                alert("Ocurrió un error al intentar abrir WhatsApp.");
-                console.error(error);
-            }
-        });
+    // ---------------- contactos ----------------
+    let contacts = [];
+    async function loadContacts() {
+        const estado = $('c-estado').value;
+        const all = await api('/api/places' + (estado ? '?estado=' + estado : ''));
+        contacts = estado ? all : all.filter(p => p.estado !== 'nuevo');
+        renderContacts();
     }
-    
-    btnBuscar.addEventListener('click', async () => {
-        const rubro = document.getElementById('rubro').value;
-        const ciudad = document.getElementById('ciudad').value;
-        const limite = document.getElementById('limite').value;
-        
-        currentSearchData = [];
-        
-        // Preparar lista para guardado progresivo
-        const listId = Date.now();
-        const initialLists = getSavedLists();
-        initialLists.push({
-            id: listId,
-            date: new Date().toLocaleString('es-AR'),
-            name: `${rubro} en ${ciudad}`,
-            data: []
-        });
-        saveLists(initialLists);
-        
-        // Efecto visual en la UI
-        btnBuscar.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Extrayendo datos de Maps...';
-        btnBuscar.disabled = true;
-        
-        tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Iniciando motor de búsqueda para "${rubro}" en "${ciudad}"...<br><small>Esto puede tomar desde unos segundos hasta varios minutos (aprox. 1 minuto por cada 20 resultados) dependiendo de la cantidad de ciudades y el límite.</small></td></tr>`;
-        
+    function renderContacts() {
+        const t = $('c-texto').value.trim().toLowerCase();
+        const list = contacts.filter(p => !t || `${p.name} ${p.categoria} ${p.notas}`.toLowerCase().includes(t));
+        const opts = (cur) => Object.entries(ESTADOS).map(([k, [txt]]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${txt}</option>`).join('');
+        document.querySelector('#tabla-contactos tbody').innerHTML = list.length ? list.map(p => `
+            <tr data-id="${esc(p.id)}">
+                <td><strong>${esc(p.name)}</strong><br><small class="text-muted">${esc(p.categoria || p.rubro || '')}</small></td>
+                <td>${esc(p.phone || '-')}</td>
+                <td><small>${esc(p.sent_at || '-')}</small></td>
+                <td><select class="c-estado">${opts(p.estado)}</select></td>
+                <td><input type="text" class="c-notas input-sm" value="${esc(p.notas || '')}" placeholder="Agregar nota..."></td>
+                <td class="links">${linksCell(p)}</td>
+            </tr>`).join('') : '<tr><td colspan="6" class="empty-state">No hay contactos con ese estado.</td></tr>';
+    }
+    $('c-estado').addEventListener('change', loadContacts);
+    $('c-texto').addEventListener('input', renderContacts);
+    document.querySelector('#tabla-contactos tbody').addEventListener('change', async e => {
+        const tr = e.target.closest('tr');
+        if (e.target.classList.contains('c-estado')) await api('/api/places/update', { body: { id: tr.dataset.id, estado: e.target.value } });
+        if (e.target.classList.contains('c-notas')) await api('/api/places/update', { body: { id: tr.dataset.id, notas: e.target.value } });
+        const p = contacts.find(x => x.id === tr.dataset.id);
+        if (p) { p.estado = tr.querySelector('.c-estado').value; p.notas = tr.querySelector('.c-notas').value; }
+    });
+    $('btn-excel-contactos').addEventListener('click', () => downloadExcel(contacts.map(p => p.id), 'Contactos'));
+
+    // ---------------- plantillas ----------------
+    let templates = [];
+    async function loadTemplates() {
+        templates = await api('/api/templates');
+        $('tpl-list').innerHTML = templates.map(t => `
+            <div class="tpl-item">
+                <div class="tpl-head">
+                    <strong>${esc(t.name)}</strong> ${t.is_default ? '<span class="badge blue">General</span>' : ''}
+                    <span class="tpl-actions">
+                        <button class="btn-ghost btn-sm" data-act="edit" data-id="${t.id}"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn-danger btn-sm" data-act="del" data-id="${t.id}"><i class="fa-solid fa-trash"></i></button>
+                    </span>
+                </div>
+                <small class="text-muted">Rubros: ${esc(t.rubros || (t.is_default ? 'todos los demás' : '—'))} · ${t.body.split('|||').length} variante(s)</small>
+                <p class="tpl-body">${esc(t.body.split('|||')[0].trim())}</p>
+            </div>`).join('');
+        return templates;
+    }
+    function clearTplForm() {
+        ['tpl-id', 'tpl-name', 'tpl-rubros', 'tpl-body'].forEach(id => $(id).value = '');
+        $('tpl-default').checked = false;
+        $('tpl-form-title').textContent = 'Nueva plantilla';
+        renderTplPreview();
+    }
+    function renderTplPreview() {
+        const v = $('tpl-body').value.split('|||').map(s => s.trim()).filter(Boolean);
+        $('tpl-preview').innerHTML = v.length ? '<small class="text-muted">Vista previa (ejemplo: "La Esquina", Corrientes):</small>' + v.map((m, i) =>
+            `<div class="bubble"><small>Variante ${i + 1}</small><br>${esc(m.replaceAll('{nombre}', 'La Esquina').replaceAll('{ciudad}', 'Corrientes').replaceAll('{rubro}', 'bar'))}</div>`).join('') : '';
+    }
+    $('tpl-body').addEventListener('input', renderTplPreview);
+    $('btn-tpl-new').addEventListener('click', clearTplForm);
+    $('btn-tpl-save').addEventListener('click', async () => {
+        const r = await api('/api/templates', { body: {
+            id: $('tpl-id').value || null, name: $('tpl-name').value.trim(), rubros: $('tpl-rubros').value.trim(),
+            body: $('tpl-body').value.trim(), is_default: $('tpl-default').checked } });
+        if (!r.success) return alert(r.error);
+        clearTplForm();
+        loadTemplates();
+    });
+    $('tpl-list').addEventListener('click', async e => {
+        const b = e.target.closest('button');
+        if (!b) return;
+        const t = templates.find(x => x.id == b.dataset.id);
+        if (b.dataset.act === 'edit') {
+            $('tpl-id').value = t.id; $('tpl-name').value = t.name; $('tpl-rubros').value = t.rubros;
+            $('tpl-body').value = t.body; $('tpl-default').checked = !!t.is_default;
+            $('tpl-form-title').textContent = 'Editando: ' + t.name;
+            renderTplPreview();
+        } else if (b.dataset.act === 'del' && confirm(`¿Borrar la plantilla "${t.name}"?`)) {
+            await fetch('/api/templates/' + t.id, { method: 'DELETE' });
+            loadTemplates();
+        }
+    });
+
+    // Recuperar plantillas viejas que estaban guardadas solo en este navegador
+    (async () => {
         try {
-            // Construir la URL con parámetros para GET
-            const params = new URLSearchParams({
-                rubro,
-                ciudad,
-                limit: parseInt(limite)
-            });
-            
-            const eventSource = new EventSource('/api/search_stream?' + params.toString());
-            let hasResults = false;
-            
-            eventSource.onmessage = function(event) {
-                const data = JSON.parse(event.data);
-                
-                if (data.status === 'result') {
-                    if (!hasResults) {
-                        tbody.innerHTML = ''; // Limpiar el mensaje de carga con el primer resultado
-                        hasResults = true;
-                    }
-                    
-                    const local = data.data;
-                    currentSearchData.push(local);
-                    
-                    // Guardado progresivo en localStorage
-                    const currentLists = getSavedLists();
-                    const targetList = currentLists.find(l => l.id === listId);
-                    if (targetList) {
-                        targetList.data.push(local);
-                        localStorage.setItem('saved_lists', JSON.stringify(currentLists));
-                    }
-                    
-                    const tr = document.createElement('tr');
-                    const idealClient = !local.has_web && local.phone !== "No tiene";
-                    
-                    tr.innerHTML = `
-                        <td><input type="checkbox" class="local-check" ${idealClient ? 'checked' : ''} data-phone="${local.phone}" data-name="${local.name}"></td>
-                        <td><strong>${local.name}</strong> ${idealClient ? '<span style="color:var(--success);font-size:0.8rem;margin-left:5px;"><i class="fa-solid fa-star"></i> Ideal</span>' : ''}</td>
-                        <td>${local.phone}</td>
-                        <td>${local.has_web ? '<span style="color:var(--accent)"><i class="fa-solid fa-check"></i> Sí</span>' : '<span style="color:var(--text-muted)"><i class="fa-solid fa-xmark"></i> No</span>'}</td>
-                        <td><a href="${local.url}" target="_blank" style="color: var(--accent); text-decoration: none;"><i class="fa-solid fa-map-location-dot"></i> Maps</a></td>
-                        <td><span class="status-badge" style="background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;">Pendiente</span></td>
-                    `;
-                    tbody.appendChild(tr);
-                    
-                    // Habilitar botón de enviar
-                    document.getElementById('btn-aprobar').disabled = false;
-                    
-                    // Hacer scroll automático hacia abajo si es necesario
-                    document.querySelector('.table-container').scrollTop = document.querySelector('.table-container').scrollHeight;
-                    
-                } else if (data.status === 'done') {
-                    eventSource.close();
-                    if (!hasResults) {
-                        tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Búsqueda finalizada. No se encontraron resultados viables.</td></tr>`;
-                        // Eliminar la lista vacía si no hubo resultados
-                        const currentLists = getSavedLists();
-                        const newLists = currentLists.filter(l => l.id !== listId);
-                        saveLists(newLists);
-                    } else {
-                        // Renderizar las listas guardadas para actualizar la vista
-                        renderSavedLists();
-                    }
-                    btnBuscar.innerHTML = '<i class="fa-solid fa-search"></i> Buscar en Maps';
-                    btnBuscar.disabled = false;
-                } else if (data.status === 'error') {
-                    eventSource.close();
-                    if (!hasResults) {
-                        tbody.innerHTML = `<tr><td colspan="6" class="empty-state" style="color: #ef4444;">Ocurrió un error: ${data.message}</td></tr>`;
-                        // Eliminar la lista vacía si no hubo resultados
-                        const currentLists = getSavedLists();
-                        const newLists = currentLists.filter(l => l.id !== listId);
-                        saveLists(newLists);
-                    } else {
-                        renderSavedLists();
-                    }
-                    btnBuscar.innerHTML = '<i class="fa-solid fa-search"></i> Buscar en Maps';
-                    btnBuscar.disabled = false;
-                    console.error("Error backend:", data.message);
-                }
-            };
-            
-            eventSource.onerror = function(error) {
-                console.error("EventSource failed:", error);
-                eventSource.close();
-                if (!hasResults) {
-                    tbody.innerHTML = `<tr><td colspan="6" class="empty-state" style="color: #ef4444;">Error de conexión con el servidor. Revisar consola.</td></tr>`;
-                    // Eliminar la lista vacía
-                    const currentLists = getSavedLists();
-                    const newLists = currentLists.filter(l => l.id !== listId);
-                    saveLists(newLists);
-                } else {
-                    renderSavedLists();
-                }
-                btnBuscar.innerHTML = '<i class="fa-solid fa-search"></i> Buscar en Maps';
-                btnBuscar.disabled = false;
-            };
-            
-        } catch (error) {
-            console.error("Error iniciando búsqueda:", error);
-            tbody.innerHTML = `<tr><td colspan="6" class="empty-state" style="color: #ef4444;">No se pudo iniciar el stream. Revisa la consola.</td></tr>`;
-            btnBuscar.innerHTML = '<i class="fa-solid fa-search"></i> Buscar en Maps';
-            btnBuscar.disabled = false;
-        }
+            const old = JSON.parse(localStorage.getItem('templates') || '[]');
+            if (old.length && !localStorage.getItem('templates_migradas')) {
+                const r = await api('/api/templates/import', { body: old });
+                localStorage.setItem('templates_migradas', '1');
+                if (r.importadas) alert(`Se recuperaron ${r.importadas} plantilla(s) que tenías guardadas en el navegador.`);
+            }
+        } catch (e) { /* sin acceso a localStorage */ }
+    })();
+
+    // ---------------- modal: preparar mensajes ----------------
+    let preview = [];
+    async function openPrepare() {
+        await loadTemplates();
+        $('modal-template').innerHTML = '<option value="auto">Automática según el rubro</option>' +
+            templates.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('');
+        $('modal').style.display = 'flex';
+        await refreshPreview();
+    }
+    async function refreshPreview() {
+        $('modal-list').innerHTML = '<p class="text-muted">Armando mensajes...</p>';
+        const ids = places.filter(p => selected.has(p.id)).sort((a, b) => (b.reviews || 0) - (a.reviews || 0)).map(p => p.id);
+        preview = await api('/api/preview', { body: { ids, template_id: $('modal-template').value } });
+        $('modal-list').innerHTML = preview.map((p, i) => `
+            <div class="prep-item" data-i="${i}">
+                <div class="prep-head">
+                    <strong>${esc(p.name)}</strong>
+                    <small class="text-muted">${esc(p.tel_tipo || '')} · plantilla: ${esc(p.template)}</small>
+                    ${p.wa_phone ? `<a href="#" class="manual lnk wa" data-i="${i}" title="Abre el chat con el mensaje escrito y lo marca como enviado"><i class="fa-brands fa-whatsapp"></i> Enviar a mano</a>` : '<span class="badge red">Sin teléfono válido</span>'}
+                </div>
+                <textarea rows="3" class="prep-msg">${esc(p.message)}</textarea>
+            </div>`).join('');
+        $('modal-enqueue').innerHTML = `<i class="fa-solid fa-list-ol"></i> Agregar ${preview.length} a la cola de envío`;
+    }
+    $('btn-preparar').addEventListener('click', openPrepare);
+    $('modal-template').addEventListener('change', refreshPreview);
+    $('modal-close').addEventListener('click', () => $('modal').style.display = 'none');
+    $('modal-list').addEventListener('input', e => {
+        if (e.target.classList.contains('prep-msg')) preview[e.target.closest('.prep-item').dataset.i].message = e.target.value;
+    });
+    $('modal-list').addEventListener('click', async e => {
+        const a = e.target.closest('.manual');
+        if (!a) return;
+        e.preventDefault();
+        const p = preview[a.dataset.i];
+        window.open(`https://wa.me/${p.wa_phone}?text=${encodeURIComponent(p.message)}`, '_blank');
+        await api('/api/places/update', { body: { id: p.id, estado: 'enviado' } });
+        const pl = places.find(x => x.id === p.id);
+        if (pl) pl.estado = 'enviado';
+        a.outerHTML = '<span class="badge green">Marcado como enviado</span>';
+    });
+    $('modal-enqueue').addEventListener('click', async () => {
+        const items = preview.map(p => ({ id: p.id, message: p.message, template_id: p.template_id }));
+        const r = await api('/api/queue', { body: { items } });
+        $('modal').style.display = 'none';
+        let msg = `Se agregaron ${r.agregados} mensajes a la cola.`;
+        if (r.salteados.length) msg += `\n\nSe saltearon ${r.salteados.length}:\n- ` + r.salteados.slice(0, 15).join('\n- ');
+        alert(msg + '\n\nAndá a "Envíos" y tocá "Iniciar envíos".');
+        const ids = new Set(items.map(i => i.id));
+        places.forEach(p => { if (ids.has(p.id) && p.estado === 'nuevo') p.estado = 'en_cola'; });
+        selected.clear();
+        renderResults();
+        refreshSender();
     });
 
-    // Lógica para Aprobar y Enviar
-    const btnAprobar = document.getElementById('btn-aprobar');
-    if(btnAprobar) {
-        btnAprobar.addEventListener('click', async () => {
-            const checkboxes = document.querySelectorAll('.local-check:checked');
-            const template = document.getElementById('mensaje').value;
-            
-            if (checkboxes.length === 0) {
-                alert("Por favor, selecciona al menos un local de la tabla para enviar.");
-                return;
-            }
-            
-            const clients = [];
-            checkboxes.forEach(cb => {
-                clients.push({
-                    phone: cb.dataset.phone,
-                    name: cb.dataset.name
-                });
-            });
-            
-            if(!confirm(`¿Estás segura de iniciar el envío a ${clients.length} locales?`)) return;
-            
-            const originalText = btnAprobar.innerHTML;
-            btnAprobar.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando mensajes...';
-            btnAprobar.disabled = true;
-            
-            try {
-                const response = await fetch('/api/send', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ clients, template })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    // Actualizar el estado en la tabla
-                    data.results.forEach(res => {
-                        const row = Array.from(document.querySelectorAll('.local-check')).find(cb => cb.dataset.phone === res.phone)?.closest('tr');
-                        if (row) {
-                            const statusCell = row.cells[5];
-                            if (res.status === "Enviado") {
-                                statusCell.innerHTML = `<span class="status-badge" style="background: rgba(16,185,129,0.2); color: var(--success); padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;"><i class="fa-solid fa-check-double"></i> Enviado</span>`;
-                                row.querySelector('.local-check').checked = false;
-                            } else {
-                                statusCell.innerHTML = `<span class="status-badge" style="background: rgba(239,68,68,0.2); color: #ef4444; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;"><i class="fa-solid fa-circle-exclamation"></i> Error</span>`;
-                            }
-                        }
-                    });
-                    alert("¡Campaña finalizada con éxito!");
-                } else {
-                    alert("Aviso del Sistema: " + data.error);
-                }
-            } catch (e) {
-                console.error(e);
-                alert("Ocurrió un error de conexión con el servidor local.");
-            } finally {
-                btnAprobar.innerHTML = originalText;
-                btnAprobar.disabled = false;
-            }
-        });
+    // ---------------- envíos ----------------
+    const SETTINGS = ['limite_diario', 'hora_inicio', 'hora_fin', 'demora_min', 'demora_max', 'pausa_cada', 'pausa_larga_min'];
+    async function loadEnvios() {
+        const s = await api('/api/settings');
+        SETTINGS.forEach(k => $('s-' + k).value = s[k]);
+        refreshSender();
+        loadQueue();
     }
+    async function loadQueue() {
+        const rows = await api('/api/queue');
+        const st = { pendiente: badge('en_cola').replace('En cola', 'Pendiente'), enviado: badge('enviado'), sin_whatsapp: badge('sin_whatsapp'), error: badge('error'), cancelado: '<span class="badge gray">Cancelado</span>' };
+        document.querySelector('#tabla-cola tbody').innerHTML = rows.length ? rows.map(r => `
+            <tr>
+                <td><strong>${esc(r.name || r.wa_phone)}</strong><br><small class="text-muted">${esc(r.categoria || '')}</small></td>
+                <td><small>${esc(r.message)}</small></td>
+                <td>${st[r.estado] || esc(r.estado)}${r.error ? `<br><small class="text-muted">${esc(r.error)}</small>` : ''}</td>
+                <td><small>${esc(r.sent_at || r.created)}</small></td>
+                <td>${r.estado === 'pendiente' ? `<button class="btn-ghost btn-sm" data-id="${r.id}" title="Quitar de la cola"><i class="fa-solid fa-xmark"></i></button>` : ''}</td>
+            </tr>`).join('') : '<tr><td colspan="5" class="empty-state">La cola está vacía. Prepará mensajes desde "Buscar locales".</td></tr>';
+    }
+    async function refreshSender() {
+        try {
+            const s = await api('/api/sender');
+            $('st-hoy').textContent = `${s.enviados_hoy}/${s.limite_diario}`;
+            $('st-pend').textContent = s.pendientes;
+            $('st-prox').textContent = s.proximo_envio || '—';
+            $('st-estado').textContent = s.estado;
+            $('st-log').innerHTML = s.log.map(l => `<div>${esc(l)}</div>`).join('') || '<div class="text-muted">Sin actividad todavía.</div>';
+            $('btn-start').style.display = s.activo ? 'none' : '';
+            $('btn-stop').style.display = s.activo ? '' : 'none';
+            $('badge-cola').textContent = s.pendientes || '';
+            const ses = { ok: 'conectado ✅', qr: 'escaneá el QR', desconocida: 'sin verificar' }[s.sesion];
+            $('sidebar-status').innerHTML = `WhatsApp: ${ses}<br>${s.activo ? '▶ Enviando' : '⏸ Envíos pausados'}`;
+        } catch (e) {
+            $('sidebar-status').textContent = 'Servidor desconectado';
+        }
+    }
+    $('btn-save-settings').addEventListener('click', async () => {
+        const body = {};
+        SETTINGS.forEach(k => body[k] = $('s-' + k).value);
+        if (+body.demora_max < +body.demora_min) return alert('La espera máxima debe ser mayor que la mínima.');
+        const r = await api('/api/settings', { body });
+        alert(r.success ? 'Ritmo guardado.' : r.error);
+    });
+    $('btn-start').addEventListener('click', async () => { await api('/api/sender/start', { method: 'POST' }); refreshSender(); });
+    $('btn-stop').addEventListener('click', async () => { await api('/api/sender/stop', { method: 'POST' }); refreshSender(); });
+    $('btn-wa-login').addEventListener('click', async () => {
+        await api('/api/wa_login', { method: 'POST' });
+        alert('Se abre una ventana de WhatsApp Web. Si pide QR, escanealo desde tu celular (WhatsApp > Dispositivos vinculados).');
+    });
+    $('btn-cancel-all').addEventListener('click', async () => {
+        if (!confirm('¿Quitar todos los mensajes pendientes de la cola?')) return;
+        await api('/api/queue/cancel_all', { method: 'POST' });
+        loadQueue(); refreshSender();
+    });
+    document.querySelector('#tabla-cola tbody').addEventListener('click', async e => {
+        const b = e.target.closest('button');
+        if (!b) return;
+        await fetch('/api/queue/' + b.dataset.id, { method: 'DELETE' });
+        loadQueue(); refreshSender();
+    });
+
+    setInterval(() => {
+        refreshSender();
+        if ($('view-envios').style.display !== 'none') loadQueue();
+    }, 5000);
+
+    renderPresets();
+    refreshSender();
+    renderResults();
 });

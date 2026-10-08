@@ -1,3 +1,11 @@
 __pycache__/
 wa_session/
 .env
+datos.db
+datos.db-wal
+datos.db-shm
+whatsapp_debug.log
+saved_searches.migrado.json
+busquedas_excel/
+server_log.txt
+*.log
