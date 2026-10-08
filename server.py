@@ -1,10 +1,14 @@
-from flask import Flask, send_from_directory, jsonify, request, Response, send_file
+from flask import Flask, send_from_directory, jsonify, request, Response, send_file, session, redirect
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import timedelta
 import asyncio
 import json
 import os
 import queue
 import re
+import secrets
 import threading
+import time
 import unicodedata
 
 import db
@@ -18,7 +22,12 @@ app = Flask(__name__, static_folder='public', static_url_path='')
 db.init()
 sender = Sender(db)
 
+app.secret_key = db.get_secret("secret_key") or db.set_secret("secret_key", secrets.token_hex(32))
+app.config.update(PERMANENT_SESSION_LIFETIME=timedelta(days=30), SESSION_COOKIE_SAMESITE="Lax",
+                  SESSION_COOKIE_HTTPONLY=True)
+
 current_search = {"running": False, "stop": False}
+login_fails = {"n": 0, "until": 0.0}
 
 
 def ok(**kw):
@@ -27,6 +36,79 @@ def ok(**kw):
 
 def fail(msg, code=400):
     return jsonify({"success": False, "error": msg}), code
+
+
+# ---------------- acceso con contraseña ----------------
+PUBLIC_PATHS = {"/login.html", "/styles.css", "/api/login", "/api/setup", "/api/auth_status", "/api/status"}
+
+
+def is_local_request():
+    """True solo si se abre desde esta PC (no a través del enlace para el celular)."""
+    host = (request.host or "").split(":")[0]
+    via_tunnel = request.headers.get("X-Forwarded-For") or request.headers.get("Cf-Connecting-Ip")
+    return host in ("localhost", "127.0.0.1") and not via_tunnel
+
+
+@app.before_request
+def require_login():
+    if request.path in PUBLIC_PATHS or session.get("ok"):
+        return None
+    if request.path.startswith("/api/"):
+        return fail("Sesión vencida. Volvé a ingresar.", 401)
+    return redirect("/login.html")
+
+
+@app.route('/api/auth_status')
+def auth_status():
+    return jsonify({"configurada": bool(db.get_secret("password_hash")), "local": is_local_request(),
+                    "logueado": bool(session.get("ok"))})
+
+
+@app.route('/api/setup', methods=['POST'])
+def auth_setup():
+    if db.get_secret("password_hash"):
+        return fail("La contraseña ya está configurada.")
+    if not is_local_request():
+        return fail("La contraseña se crea desde la PC donde corre el sistema (http://localhost:5000).", 403)
+    pwd = (request.json or {}).get("password", "")
+    if len(pwd) < 6:
+        return fail("Usá al menos 6 caracteres.")
+    db.set_secret("password_hash", generate_password_hash(pwd))
+    session.permanent, session["ok"] = True, True
+    return ok()
+
+
+@app.route('/api/login', methods=['POST'])
+def auth_login():
+    if time.time() < login_fails["until"]:
+        return fail("Demasiados intentos. Esperá unos minutos.", 429)
+    h = db.get_secret("password_hash")
+    if h and check_password_hash(h, (request.json or {}).get("password", "")):
+        login_fails["n"] = 0
+        session.permanent, session["ok"] = True, True
+        return ok()
+    login_fails["n"] += 1
+    if login_fails["n"] >= 8:
+        login_fails.update(n=0, until=time.time() + 600)
+    time.sleep(1)
+    return fail("Contraseña incorrecta.", 401)
+
+
+@app.route('/api/logout', methods=['POST'])
+def auth_logout():
+    session.clear()
+    return ok()
+
+
+@app.route('/api/password', methods=['POST'])
+def auth_change_password():
+    d = request.json or {}
+    if not check_password_hash(db.get_secret("password_hash") or "", d.get("actual", "")):
+        return fail("La contraseña actual no es correcta.")
+    if len(d.get("nueva", "")) < 6:
+        return fail("Usá al menos 6 caracteres.")
+    db.set_secret("password_hash", generate_password_hash(d["nueva"]))
+    return ok()
 
 
 @app.route('/')

@@ -129,7 +129,7 @@ header h1 {
     font-weight: 500;
 }
 
-input[type="text"], input[type="number"], textarea {
+input[type="text"], input[type="number"], input[type="password"], textarea {
     width: 100%;
     background: rgba(0, 0, 0, 0.2);
     border: 1px solid var(--border-color);
@@ -350,3 +350,7 @@ td.links { white-space: nowrap; }
     .main-content { padding: 1rem; }
     .grid-layout, .search-grid, .settings-grid { grid-template-columns: 1fr; }
 }
+
+.sidebar-links { display: flex; gap: 12px; margin-top: 0.6rem; }
+.sidebar-links a { color: var(--text-muted); font-size: 0.8rem; text-decoration: none; }
+.sidebar-links a:hover { color: var(--accent); }

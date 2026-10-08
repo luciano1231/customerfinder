@@ -18,5 +18,12 @@ if errorlevel 1 (
     python -m playwright install chromium
 )
 
+:: Enlace para el celular sin límite de tiempo (Cloudflare). Si falla, el lanzador usa Pinggy.
+if not exist "herramientas\cloudflared.exe" (
+    echo Descargando cloudflared por unica vez...
+    if not exist herramientas mkdir herramientas
+    curl -sL -o herramientas\cloudflared.exe https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe
+)
+
 :: Abre el lanzador (ventanita con el boton de encendido) sin consola
 start "" pythonw Lanzador.pyw

@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const api = async (url, opts = {}) => {
         const res = await fetch(url, opts.body ? { method: 'POST', headers: {'Content-Type': 'application/json'}, ...opts, body: JSON.stringify(opts.body) } : opts);
+        if (res.status === 401) { location.href = '/login.html'; throw new Error('Sesión vencida'); }
         const ct = res.headers.get('content-type') || '';
         return ct.includes('json') ? res.json() : res;
     };
@@ -438,6 +439,23 @@ document.addEventListener('DOMContentLoaded', () => {
         refreshSender();
         if ($('view-envios').style.display !== 'none') loadQueue();
     }, 5000);
+
+    // ---------------- sesión ----------------
+    $('lnk-logout').addEventListener('click', async e => {
+        e.preventDefault();
+        await api('/api/logout', { method: 'POST' });
+        location.href = '/login.html';
+    });
+    $('lnk-password').addEventListener('click', async e => {
+        e.preventDefault();
+        const actual = prompt('Contraseña actual:');
+        if (actual === null) return;
+        const nueva = prompt('Nueva contraseña (mínimo 6 caracteres):');
+        if (!nueva) return;
+        if (prompt('Repetí la nueva contraseña:') !== nueva) return alert('No coinciden.');
+        const r = await api('/api/password', { body: { actual, nueva } });
+        alert(r.success ? 'Contraseña cambiada.' : r.error);
+    });
 
     renderPresets();
     refreshSender();

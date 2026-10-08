@@ -118,6 +118,16 @@ def set_settings(values):
             execute("INSERT OR REPLACE INTO settings (k, v) VALUES (?, ?)", (k, json.dumps(v)))
 
 
+def get_secret(k):
+    r = query("SELECT v FROM settings WHERE k=?", ("_" + k,), one=True)
+    return r["v"] if r else None
+
+
+def set_secret(k, v):
+    execute("INSERT OR REPLACE INTO settings (k, v) VALUES (?, ?)", ("_" + k, v))
+    return v
+
+
 # ---------- locales ----------
 PLACE_FIELDS = ["name", "phone", "wa_phone", "tel_tipo", "address", "categoria", "rubro", "ciudad", "rating",
                 "reviews", "web", "web_tipo", "instagram", "horarios", "nocturno", "maps_url"]
